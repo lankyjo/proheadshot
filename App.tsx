@@ -21,7 +21,7 @@ const App: React.FC = () => {
 
   const [config, setConfig] = useState<HeadshotConfig>({
     template: TemplateType.FRONT_SMILING,
-    expression: ExpressionType.SMILE,
+    expression: ExpressionType.NEUTRAL,
     glasses: GlassesType.NONE,
     backgroundType: BackgroundType.STUDIO,
     backgroundColor: '#0F0F0F',
@@ -99,6 +99,15 @@ const App: React.FC = () => {
     link.click();
   };
 
+  const handleView = () => {
+    if (!resultImage) return;
+    const newTab = window.open();
+    if (newTab) {
+      newTab.document.write(`<img src="${resultImage}" style="max-width: 100%; height: auto; display: block; margin: auto;" />`);
+      newTab.document.title = "View Headshot";
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col transition-colors duration-500 text-onyx dark:text-cream selection:bg-onyx selection:text-cream dark:selection:bg-cream dark:selection:text-onyx">
       {/* Navigation */}
@@ -121,13 +130,6 @@ const App: React.FC = () => {
               className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-onyx/5 dark:hover:bg-cream/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {theme === 'light' ? <Icons.Moon /> : <Icons.Sun />}
-            </button>
-            <button 
-              onClick={() => window.location.reload()}
-              disabled={isGenerating}
-              className="text-xs font-bold tracking-widest uppercase hover:opacity-50 transition-opacity flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <Icons.Refresh /> Reset
             </button>
           </div>
         </div>
@@ -226,19 +228,33 @@ const App: React.FC = () => {
                     ))}
                   </div>
 
-                  {/* Tie Toggle */}
-                  <div className="flex items-center justify-between p-4 border border-onyx/10 dark:border-cream/10 rounded-2xl">
-                    <p className="text-[10px] font-black uppercase tracking-widest">Formal Tie</p>
-                    <button
-                      disabled={isGenerating}
-                      onClick={() => setConfig({ ...config, hasTie: !config.hasTie })}
-                      className={`w-12 h-6 rounded-full p-1 transition-colors relative disabled:opacity-30 disabled:cursor-not-allowed
-                        ${config.hasTie ? 'bg-onyx dark:bg-cream' : 'bg-onyx/10 dark:bg-cream/10'}`}
-                    >
-                      <div className={`w-4 h-4 rounded-full transition-transform
-                        ${config.hasTie ? 'translate-x-6 bg-cream dark:bg-onyx' : 'translate-x-0 bg-onyx dark:bg-cream'}`} 
-                      />
-                    </button>
+                  {/* Tie Selection - Icon Grid Style */}
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest block opacity-40 mb-3">Formal Attire</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        disabled={isGenerating}
+                        onClick={() => setConfig({ ...config, hasTie: true })}
+                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all
+                          ${config.hasTie 
+                            ? 'bg-onyx dark:bg-cream text-cream dark:text-onyx border-onyx dark:border-cream shadow-md' 
+                            : 'bg-transparent border-onyx/10 dark:border-cream/10 text-onyx/40 dark:text-cream/40 hover:border-onyx/30 disabled:opacity-30 disabled:cursor-not-allowed'}`}
+                      >
+                        <Icons.Tie />
+                        <span className="text-[7px] font-bold uppercase tracking-widest">Formal Tie</span>
+                      </button>
+                      <button
+                        disabled={isGenerating}
+                        onClick={() => setConfig({ ...config, hasTie: false })}
+                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all
+                          ${!config.hasTie 
+                            ? 'bg-onyx dark:bg-cream text-cream dark:text-onyx border-onyx dark:border-cream shadow-md' 
+                            : 'bg-transparent border-onyx/10 dark:border-cream/10 text-onyx/40 dark:text-cream/40 hover:border-onyx/30 disabled:opacity-30 disabled:cursor-not-allowed'}`}
+                      >
+                        <Icons.NoTie />
+                        <span className="text-[7px] font-bold uppercase tracking-widest">No Tie</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Eyewear */}
@@ -316,7 +332,7 @@ const App: React.FC = () => {
                             disabled={isGenerating}
                             onClick={() => setConfig({ ...config, backgroundColor: c })}
                             className={`w-6 h-6 rounded-full border transition-all hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed
-                              ${config.backgroundColor === c ? 'border-onyx dark:border-cream scale-110 shadow-lg' : 'border-white/20'}`}
+                              ${config.backgroundColor === c ? 'border-onyx dark:bg-cream scale-110 shadow-lg' : 'border-white/20'}`}
                             style={{ backgroundColor: c }}
                           />
                         ))}
@@ -415,26 +431,54 @@ const App: React.FC = () => {
                       alt="ProShot Headshot" 
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-onyx/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center backdrop-blur-sm">
+                    
+                    {/* Static Corner Icons for Mobile/UX */}
+                    <button 
+                      onClick={handleView}
+                      className="absolute top-4 right-4 p-3 bg-white/20 backdrop-blur-md rounded-full text-white shadow-lg hover:bg-white/40 transition-all z-20"
+                      title="Maximize"
+                    >
+                      <Icons.Maximize />
+                    </button>
+                    
+                    <button 
+                      onClick={handleDownload}
+                      className="absolute bottom-4 left-4 p-3 bg-white/20 backdrop-blur-md rounded-full text-white shadow-lg hover:bg-white/40 transition-all z-20"
+                      title="Download"
+                    >
+                      <Icons.Download />
+                    </button>
+
+                    <div className="absolute inset-0 bg-onyx/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center backdrop-blur-sm gap-4">
                       <button 
                         onClick={handleDownload}
-                        className="bg-cream text-onyx px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                        className="bg-cream text-onyx w-48 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <Icons.Download />
                         Save Headshot
+                      </button>
+                      
+                      <button 
+                        onClick={handleView}
+                        className="bg-white/10 text-white border border-white/20 w-48 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl hover:bg-white/20 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Icons.View />
+                        View Headshot
                       </button>
                     </div>
                   </div>
                 </div>
                 
-                <div className="mt-12 flex gap-4">
-                  <button 
-                    onClick={handleDownload}
-                    className="group bg-onyx dark:bg-cream text-cream dark:text-onyx px-10 py-5 rounded-full font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:opacity-80 transition-all flex items-center gap-3"
-                  >
-                    <span>Download Final</span>
-                    <Icons.Check />
-                  </button>
+                <div className="mt-12 flex flex-col items-center gap-4">
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={handleDownload}
+                      className="group bg-onyx dark:bg-cream text-cream dark:text-onyx px-10 py-5 rounded-full font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl hover:opacity-80 transition-all flex items-center gap-3"
+                    >
+                      <span>Export High-Res</span>
+                      <Icons.Check />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -446,7 +490,7 @@ const App: React.FC = () => {
               { label: 'Ratio', val: '1:1 Sq', icon: '📐' },
               { label: 'Optics', val: '85mm f/1.2', icon: '📷' },
               { label: 'Backdrop', val: config.backgroundType.split(' ')[0], icon: '💡' },
-              { label: 'Identity', val: 'Lock V2.2', icon: '✨' },
+              { label: 'Identity', val: 'Lock V2.4', icon: '✨' },
             ].map((s) => (
               <div key={s.label} className="p-4 bg-white/5 dark:bg-white/5 border border-onyx/5 dark:border-cream/5 rounded-3xl backdrop-blur-xl flex flex-col items-center justify-center text-center group hover:bg-onyx dark:hover:bg-cream transition-all">
                  <p className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 group-hover:text-cream dark:group-hover:text-onyx transition-colors">{s.label}</p>
