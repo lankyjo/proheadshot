@@ -1,0 +1,7 @@
+{
+  "name": "ProShot AI",
+  "description": "Professional headshot generator that transforms your casual photos into high-quality corporate portraits using advanced AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
