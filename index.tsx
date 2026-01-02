@@ -1,5 +1,6 @@
 
-import React from 'react';
+// Fix: Use named imports for React to avoid resolution conflicts with the local react directory.
+import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
@@ -10,7 +11,7 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
-  <React.StrictMode>
+  <StrictMode>
     <App />
-  </React.StrictMode>
+  </StrictMode>
 );

@@ -6,7 +6,8 @@ export const generateProfessionalHeadshot = async (
   base64Image: string,
   config: HeadshotConfig
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  // Always initialize with named parameter and use process.env.API_KEY directly.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const templateDescription = {
     [TemplateType.FRONT_SMILING]: "a professional front-facing corporate headshot, shoulders up, looking directly into the lens. Maintain the exact facial bone structure of the subject.",
@@ -17,48 +18,41 @@ export const generateProfessionalHeadshot = async (
   const backgroundDescription = {
     [BackgroundType.STUDIO]: `in a professional photography studio. Textured charcoal or grey backdrop with a cinematic spotlight halo hitting the center directly behind the subject's head.`,
     [BackgroundType.PLAIN]: `against a solid, professional ${config.backgroundColor} studio backdrop with subtle realistic vignetting and natural film grain.`,
-    [BackgroundType.OFFICE]: `inside a realistic, modern corporate office interior. Soft-focus office partitions, indoor plants, and warm interior lighting. NO city skylines or skyscrapers—purely a genuine indoor executive workspace.`
+    [BackgroundType.OFFICE]: `inside a realistic, modern corporate office interior. Soft-focus office partitions, indoor plants, and warm interior lighting.`
   }[config.backgroundType];
 
   const glassesText = {
     [GlassesType.NONE]: "without any glasses",
     [GlassesType.WAYFARER]: "wearing high-quality, realistic Classic Wayfarer glasses",
     [GlassesType.ROUND]: "wearing high-quality, realistic Round Minimalist glasses",
-    [GlassesType.RECTANGULAR]: "wearing modern, sophisticated frameless rectangular glasses with thin, minimal metal arms. The lenses are completely rimless.",
+    [GlassesType.RECTANGULAR]: "wearing modern, sophisticated frameless rectangular glasses with thin, minimal metal arms.",
     [GlassesType.CAT_EYE]: "wearing high-quality, realistic Chic Cat-eye glasses",
     [GlassesType.AVIATOR]: "wearing high-quality, realistic Professional Aviator glasses"
   }[config.glasses];
 
   const clothingStyle = `dressed in premium professional business attire. A sharp tailored suit jacket. ${config.hasTie ? 'With a formal silk tie.' : 'Modern open-neck shirt look with no tie.'}`;
 
-  // Hyper-focused prompt on Identity Lock and Proportional Fidelity
   const prompt = `
     TASK: Generate a high-resolution, professional corporate 1:1 square portrait.
     
-    IDENTITY LOCK & PROPORTIONAL FIDELITY (CRITICAL):
-    - SPLITTING IMAGE: The person in the output MUST be a perfect digital twin of the person in the source photo. 
-    - NO FACIAL WIDENING: Do NOT make the face wider or fatter than the source. Maintain the exact jawline width, neck circumference, and cheekbone structure. 
-    - PROPORTION MATCH: The head-to-shoulder ratio must match the source exactly. Do not "fill out" the subject. If the subject is lean, they must remain lean.
-    - SMILING LOGIC: When smiling, only the mouth and eye-corners (crow's feet) should move. The overall width of the face and head MUST NOT CHANGE. Avoid the "fat-cheeked" AI smile look.
-    - ANATOMICAL ACCURACY: Preserve unique eye shape, brow arch, nose bridge width, and chin shape. Match the subject's unique skin tone and ethnicity perfectly.
+    IDENTITY LOCK:
+    - The subject in the output MUST be a perfect digital twin of the person in the source photo. 
+    - Maintain exact jawline width, neck circumference, and cheekbone structure. 
+    - Do NOT widen or change the face shape.
     
-    RAW PHOTOGRAPHY FINISH (AVOID 3D/SMOOTH LOOK):
-    - NO plastic skin. NO airbrushed textures. NO "uncanny valley" 3D-render smoothness.
-    - Render realistic high-end photography textures: visible skin pores, fine facial hair, natural skin oils, and authentic film grain.
-    - Sharp focus on the pupils, natural depth of field with soft bokeh.
+    RAW PHOTOGRAPHY FINISH:
+    - NO plastic skin. Render realistic pores, fine facial hair, and authentic film grain.
+    - Sharp focus on the eyes, natural depth of field with soft bokeh.
     
     COMPOSITION & STYLING:
     - Pose: ${templateDescription}.
-    - Expression: ${config.expression === ExpressionType.SMILE ? 'an authentic, warm, approachable corporate smile that maintains the subject\'s original facial silhouette' : 'a calm, authoritative, and professional neutral expression'}.
+    - Expression: ${config.expression === ExpressionType.SMILE ? 'an authentic corporate smile' : 'a professional neutral expression'}.
     - Eyewear: ${glassesText}.
     - Environment: ${backgroundDescription}.
     - Clothing: ${clothingStyle}.
-    - Lighting: Cinematic 3-point studio lighting with high dynamic range.
-    - Color Grade: ${config.isMonochrome ? 'High-contrast fine-art black and white, professional silver halide texture' : 'Natural professional skin tones, realistic color depth'}.
+    - Color Grade: ${config.isMonochrome ? 'Fine-art black and white' : 'Natural professional skin tones'}.
     
-    TECHNICAL:
-    - 1:1 Aspect Ratio square crop.
-    - Close-up portrait, framing from top of head to middle of chest.
+    TECHNICAL: 1:1 Aspect Ratio square crop. Close-up portrait.
   `.trim();
 
   try {
@@ -82,6 +76,7 @@ export const generateProfessionalHeadshot = async (
       }
     });
 
+    // Correct way to iterate through parts to find the generated image.
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
         return `data:image/png;base64,${part.inlineData.data}`;
