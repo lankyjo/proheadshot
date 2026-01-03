@@ -1,6 +1,6 @@
 
-// Fix: Use named imports for React types to avoid property access errors.
-import { ReactNode } from 'react';
+// Fix: Use default and named import for React to resolve ReactNode export error.
+import React, { ReactNode } from 'react';
 
 export const COLORS = [
   '#0F0F0F', '#1A1A1A', '#333333', '#4D4D4D', 

@@ -1,16 +1,14 @@
 
-// Fix: Use named imports for React to avoid resolution conflicts with the local react directory.
-import { StrictMode } from 'react';
-import ReactDOM from 'react-dom/client';
+// Fix: Use default and named import for React to resolve StrictMode export error.
+import React, { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import App from './App';
+import './index.css';
 
 const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
-}
+if (!rootElement) throw new Error("Root element not found");
 
-const root = ReactDOM.createRoot(rootElement);
-root.render(
+createRoot(rootElement).render(
   <StrictMode>
     <App />
   </StrictMode>

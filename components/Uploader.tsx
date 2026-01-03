@@ -1,6 +1,6 @@
 
-// Fix: Use named imports for React hooks and event types to fix property access errors.
-import { useRef, FC, ChangeEvent } from 'react';
+// Fix: Use default and named imports for React to resolve useRef, FC, and ChangeEvent export errors.
+import React, { useRef, FC, ChangeEvent } from 'react';
 import * as Icons from './Icons';
 
 interface UploaderProps {

@@ -1,6 +1,6 @@
 
-// Fix: Use named imports for React FC to avoid property access errors.
-import { FC } from 'react';
+// Fix: Use default and named import for React to resolve FC export error.
+import React, { FC } from 'react';
 import { TemplateType, ExpressionType, GlassesType, HeadshotConfig } from '../types';
 import * as Icons from './Icons';
 import { GlassesIcons } from '../constants';
