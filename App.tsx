@@ -1,6 +1,6 @@
 
-// Fix: Use default and named imports for React to resolve useState, useCallback, and FC export errors.
-import React, { useState, useCallback, FC } from 'react';
+// Fix: Use default and named imports for React to resolve hooks and FC export errors.
+import React, { useState, useCallback, FC, useEffect } from 'react';
 import { HeadshotConfig, TemplateType, ExpressionType, BackgroundType, GlassesType } from './types';
 import * as Icons from './components/Icons';
 import Header from './components/Header';
@@ -19,32 +19,66 @@ const MESSAGES = [
   "Polishing final raw capture..."
 ];
 
+const STORAGE_KEYS = {
+  THEME: 'proshot_theme',
+  CONFIG: 'proshot_config'
+};
+
 const App: FC = () => {
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingMsg, setLoadingMsg] = useState('');
-  const [theme, setTheme] = useState<'light' | 'dark'>(
-    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  );
-  const [activeTab, setActiveTab] = useState<'identity' | 'studio'>('identity');
-
-  const [config, setConfig] = useState<HeadshotConfig>({
-    template: TemplateType.FRONT_SMILING,
-    expression: ExpressionType.NEUTRAL,
-    glasses: GlassesType.NONE,
-    backgroundType: BackgroundType.STUDIO,
-    backgroundColor: '#0F0F0F',
-    isMonochrome: false,
-    hasTie: true,
+  
+  // 1. Initial Theme Logic: LocalStorage -> System Preference -> Default Light
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.THEME);
+    if (saved === 'light' || saved === 'dark') return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
-  const toggleTheme = useCallback(() => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.documentElement.classList.toggle('dark');
+  // 2. Initial Config Logic: LocalStorage -> Defaults
+  const [config, setConfig] = useState<HeadshotConfig>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CONFIG);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved config", e);
+      }
+    }
+    return {
+      template: TemplateType.FRONT_SMILING,
+      expression: ExpressionType.NEUTRAL,
+      glasses: GlassesType.NONE,
+      backgroundType: BackgroundType.STUDIO,
+      backgroundColor: '#0F0F0F',
+      isMonochrome: false,
+      hasTie: true,
+    };
+  });
+
+  const [activeTab, setActiveTab] = useState<'identity' | 'studio'>('identity');
+
+  // Sync theme to DOM and LocalStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.THEME, theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [theme]);
+
+  // Sync config to LocalStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
+  }, [config]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  }, []);
 
   const handleGenerate = async () => {
     if (!sourceImage) return;
@@ -68,7 +102,7 @@ const App: FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-onyx dark:text-cream selection:bg-onyx selection:text-cream dark:selection:bg-cream dark:selection:text-onyx">
+    <div className="min-h-screen flex flex-col font-sans text-onyx dark:text-cream selection:bg-onyx selection:text-cream dark:selection:bg-cream dark:selection:text-onyx bg-cream dark:bg-onyx transition-colors duration-500">
       <Header theme={theme} toggleTheme={toggleTheme} isGenerating={isGenerating} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-12">
