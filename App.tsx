@@ -1,14 +1,18 @@
-
-// Fix: Use default and named imports for React to resolve hooks and FC export errors.
-import React, { useState, useCallback, FC, useEffect } from 'react';
-import { HeadshotConfig, TemplateType, ExpressionType, BackgroundType, GlassesType } from './types';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { GoogleGenAI } from "@google/genai";
+import { TemplateType, ExpressionType, BackgroundType, GlassesType, HeadshotConfig } from './types';
 import * as Icons from './components/Icons';
-import Header from './components/Header';
-import Uploader from './components/Uploader';
+import { COLORS, GlassesIcons } from './constants';
 import ConfigTabIdentity from './components/ConfigTabIdentity';
 import ConfigTabStudio from './components/ConfigTabStudio';
+import Header from './components/Header';
+import Uploader from './components/Uploader';
 import ResultPreview from './components/ResultPreview';
-import { generateProfessionalHeadshot } from './services/gemini';
+
+const STORAGE_KEYS = {
+  THEME: 'proshot_theme',
+  CONFIG: 'proshot_config'
+};
 
 const MESSAGES = [
   "Synchronizing facial landmarks...",
@@ -19,34 +23,24 @@ const MESSAGES = [
   "Polishing final raw capture..."
 ];
 
-const STORAGE_KEYS = {
-  THEME: 'proshot_theme',
-  CONFIG: 'proshot_config'
-};
-
-const App: FC = () => {
+const App: React.FC = () => {
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingMsg, setLoadingMsg] = useState('');
-  
-  // 1. Initial Theme Logic: LocalStorage -> System Preference -> Default Light
+  const [activeTab, setActiveTab] = useState<'identity' | 'studio'>('identity');
+
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.THEME);
     if (saved === 'light' || saved === 'dark') return saved;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
-  // 2. Initial Config Logic: LocalStorage -> Defaults
   const [config, setConfig] = useState<HeadshotConfig>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CONFIG);
     if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse saved config", e);
-      }
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
     }
     return {
       template: TemplateType.FRONT_SMILING,
@@ -59,26 +53,16 @@ const App: FC = () => {
     };
   });
 
-  const [activeTab, setActiveTab] = useState<'identity' | 'studio'>('identity');
-
-  // Sync theme to DOM and LocalStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.THEME, theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
-  // Sync config to LocalStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
   }, [config]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  }, []);
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   const handleGenerate = async () => {
     if (!sourceImage) return;
@@ -88,13 +72,51 @@ const App: FC = () => {
     const interval = setInterval(() => {
       setLoadingMsg(MESSAGES[msgIndex % MESSAGES.length]);
       msgIndex++;
-    }, 2000);
+    }, 2500);
 
     try {
-      const result = await generateProfessionalHeadshot(sourceImage, config);
-      setResultImage(result);
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
+      const prompt = `
+        TASK: Generate a high-fidelity professional corporate 1:1 portrait.
+        IDENTITY: The subject MUST be a perfect digital twin of the source image. Match facial geometry, skin texture, and unique features precisely.
+        POSE: ${config.template}. 
+        EXPRESSION: ${config.expression === ExpressionType.SMILE ? 'authentic corporate smile' : 'professional neutral'}.
+        EYEWEAR: ${config.glasses === GlassesType.NONE ? 'strictly no glasses' : 'wearing ' + config.glasses}.
+        ENVIRONMENT: ${config.backgroundType === BackgroundType.PLAIN ? 'clean solid studio background color ' + config.backgroundColor : config.backgroundType}.
+        CLOTHING: dressed in premium bespoke business attire. Sharp tailored suit jacket. ${config.hasTie ? 'With a silk tie.' : 'Modern open neck shirt.'}
+        ARTISTIC: ${config.isMonochrome ? 'High-contrast fine-art black and white photography.' : 'Natural professional skin tones.'}
+        TECHNICAL: Sharp focus on the eyes, 85mm lens compression, cinematic three-point lighting, 8K raw quality.
+      `.trim();
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-image-preview',
+        contents: {
+          parts: [
+            { inlineData: { data: sourceImage.split(',')[1], mimeType: 'image/jpeg' } },
+            { text: prompt },
+          ],
+        },
+        config: { 
+          imageConfig: { 
+            aspectRatio: "1:1",
+            imageSize: "2K"
+          } 
+        }
+      });
+
+      const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+      if (part?.inlineData) {
+        setResultImage(`data:image/png;base64,${part.inlineData.data}`);
+      } else {
+        throw new Error("Studio failed to deliver asset.");
+      }
     } catch (err: any) {
-      setError(err.message || "Studio encountered an error. Try again.");
+      if (err.message?.includes("429") || err.message?.includes("quota")) {
+        setError("Studio Quota Exceeded. Please try again later or check your API configuration.");
+      } else {
+        setError(err.message || "Studio Error: Generation failed.");
+      }
     } finally {
       clearInterval(interval);
       setIsGenerating(false);
@@ -102,44 +124,67 @@ const App: FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-onyx dark:text-cream selection:bg-onyx selection:text-cream dark:selection:bg-cream dark:selection:text-onyx bg-cream dark:bg-onyx transition-colors duration-500">
+    <div className="min-h-screen flex flex-col transition-colors duration-500 bg-cream dark:bg-onyx text-onyx dark:text-cream">
       <Header theme={theme} toggleTheme={toggleTheme} isGenerating={isGenerating} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-4 space-y-6">
           <Uploader sourceImage={sourceImage} isGenerating={isGenerating} onUpload={setSourceImage} />
           
-          <div className="bg-white/5 dark:bg-white/5 rounded-[2.5rem] border border-onyx/5 dark:border-cream/5 backdrop-blur-xl overflow-hidden shadow-sm">
+          <div className="bg-white/5 dark:bg-white/5 rounded-[2.5rem] border border-onyx/5 dark:border-cream/5 shadow-sm overflow-hidden backdrop-blur-md">
             <div className="flex border-b border-onyx/10 dark:border-cream/10">
-              <button onClick={() => setActiveTab('identity')} disabled={isGenerating} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'identity' ? 'bg-onyx dark:bg-cream text-cream dark:text-onyx' : 'hover:bg-onyx/5 dark:hover:bg-cream/5'}`}>01. Identity</button>
-              <button onClick={() => setActiveTab('studio')} disabled={isGenerating} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'studio' ? 'bg-onyx dark:bg-cream text-cream dark:text-onyx' : 'hover:bg-onyx/5 dark:hover:bg-cream/5'}`}>02. Studio</button>
+              <button 
+                onClick={() => setActiveTab('identity')} 
+                className={`flex-1 py-4 text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'identity' ? 'bg-onyx dark:bg-cream text-cream dark:text-onyx' : 'hover:bg-onyx/5 dark:hover:bg-cream/5'}`}
+              >
+                01. Identity
+              </button>
+              <button 
+                onClick={() => setActiveTab('studio')} 
+                className={`flex-1 py-4 text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'studio' ? 'bg-onyx dark:bg-cream text-cream dark:text-onyx' : 'hover:bg-onyx/5 dark:hover:bg-cream/5'}`}
+              >
+                02. Studio
+              </button>
             </div>
+            
             <div className="p-6">
-              {activeTab === 'identity' ? <ConfigTabIdentity config={config} setConfig={setConfig} isGenerating={isGenerating} /> : <ConfigTabStudio config={config} setConfig={setConfig} isGenerating={isGenerating} />}
+              {activeTab === 'identity' ? (
+                <ConfigTabIdentity config={config} setConfig={setConfig} isGenerating={isGenerating} />
+              ) : (
+                <ConfigTabStudio config={config} setConfig={setConfig} isGenerating={isGenerating} />
+              )}
             </div>
           </div>
 
-          <button onClick={handleGenerate} disabled={!sourceImage || isGenerating} className={`w-full py-6 rounded-[2.5rem] font-black text-lg tracking-[0.2em] uppercase shadow-2xl flex items-center justify-center gap-4 transition-all group overflow-hidden ${!sourceImage || isGenerating ? 'opacity-30 cursor-not-allowed' : 'bg-onyx dark:bg-cream text-cream dark:text-onyx hover:scale-[0.98]'}`}>
-            {isGenerating ? <div className="w-5 h-5 border-[3px] border-cream/30 border-t-cream rounded-full animate-spin" /> : <><Icons.Sparkles /> Generate Portrait</>}
+          <button 
+            onClick={handleGenerate} 
+            disabled={!sourceImage || isGenerating} 
+            className="w-full py-6 bg-onyx dark:bg-cream text-cream dark:text-onyx rounded-[2.5rem] font-black uppercase tracking-widest disabled:opacity-20 hover:scale-[0.98] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-3 group"
+          >
+            {isGenerating ? (
+              <div className="w-5 h-5 border-2 border-cream/30 border-t-cream rounded-full animate-spin" />
+            ) : (
+              <>
+                <Icons.Sparkles />
+                <span>Generate Portrait</span>
+              </>
+            )}
           </button>
           
-          {error && <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-[9px] font-black uppercase tracking-widest text-center rounded-2xl">{error}</div>}
+          {error && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-[9px] font-black uppercase tracking-widest text-center rounded-2xl animate-in fade-in duration-300">
+              {error}
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-8 flex flex-col">
           <ResultPreview resultImage={resultImage} isGenerating={isGenerating} loadingMsg={loadingMsg} />
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-            {['Engine: Flash V2.5', 'Format: PNG-8', 'Optics: 85mm', 'Profile: sRGB'].map((s) => (
-              <div key={s} className="p-4 bg-white/5 border border-onyx/5 rounded-3xl text-center">
-                 <p className="text-[9px] font-black uppercase tracking-widest opacity-40">{s}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </main>
 
       <footer className="py-12 border-t border-onyx/5 dark:border-cream/5 opacity-30 text-center uppercase tracking-[0.4em] font-bold text-[9px]">
-        ProShot • Professional AI Photography Protocol
+        ProShot • Professional AI Photography Protocol • v3.0 Pro
       </footer>
     </div>
   );
